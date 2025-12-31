@@ -1,0 +1,15 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Env files
+.env
+
+# Prisma
+backend/prisma/dev.db
+
+# Vite
+frontend/dist/
+
+# OS
+.DS_Store
