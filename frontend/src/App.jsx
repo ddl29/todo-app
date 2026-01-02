@@ -1,56 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import TodoItem from "./TodoItem";
-
-async function fetchTodos() {
-  const res = await fetch("http://localhost:3000/todos");
-  if (!res.ok) {
-    throw new Error("Failed to fetch todos");
-  }
-  return res.json();
-}
-
-async function createTodo(title) {
-  const res = await fetch("http://localhost:3000/todos", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ title }),
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to create todo");
-  }
-
-  return res.json();
-}
-
-async function toggleTodoRequest({ id, completed }) {
-  const res = await fetch(`http://localhost:3000/todos/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ completed })
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to update todo");
-  }
-
-  return res.json();
-}
-
-async function deleteTodoRequest(id) {
-  const res = await fetch(`http://localhost:3000/todos/${id}`, {
-    method: "DELETE"
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to delete todo");
-  }
-}
+import { fetchTodos, createTodo, toggleTodoRequest, deleteTodoRequest } from "./api/todos";
 
 function App() {
   const queryClient = useQueryClient();
