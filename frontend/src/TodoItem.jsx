@@ -1,4 +1,4 @@
-function TodoItem({ todo, onToggle, onDelete }) {
+function TodoItem({ todo, onToggle, onDelete, isToggling }) {
   return (
     <li
       className={`flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl transition-all duration-200 hover:shadow-md group ${todo.completed ? "bg-slate-50/50" : ""
@@ -8,6 +8,7 @@ function TodoItem({ todo, onToggle, onDelete }) {
         type="checkbox"
         checked={todo.completed}
         onChange={() => onToggle(todo.id)}
+        disabled={isToggling}
         className="w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer transition-colors"
       />
 

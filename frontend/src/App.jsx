@@ -1,64 +1,116 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import TodoItem from "./TodoItem";
 
+async function fetchTodos() {
+  const res = await fetch("http://localhost:3000/todos");
+  if (!res.ok) {
+    throw new Error("Failed to fetch todos");
+  }
+  return res.json();
+}
+
+async function createTodo(title) {
+  const res = await fetch("http://localhost:3000/todos", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to create todo");
+  }
+
+  return res.json();
+}
+
+async function toggleTodoRequest({ id, completed }) {
+  const res = await fetch(`http://localhost:3000/todos/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ completed })
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to update todo");
+  }
+
+  return res.json();
+}
+
+async function deleteTodoRequest(id) {
+  const res = await fetch(`http://localhost:3000/todos/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to delete todo");
+  }
+}
+
 function App() {
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
-  const [todos, setTodos] = useState([]);
+  const [togglingId, setTogglingId] = useState(null);
 
-  useEffect(() => {
-    fetch("http://localhost:3000/todos")
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("Fetched todos:", data);
-        setTodos(data);
-      });
-  }, []);
+  // Fetch all todos
+  const { data: todos, isLoading, isError, error } = useQuery({
+    queryKey: ["todos"],
+    queryFn: fetchTodos,
+  });
+  // Create a todo
+  const createTodoMutation = useMutation({
+    mutationFn: createTodo,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+      setTitle("");
+    }
+  });
+  // Update a todo
+  const toggleTodoMutation = useMutation({
+    mutationFn: toggleTodoRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+    }
+  });
+  // Delete a todo
+  const deleteTodoMutation = useMutation({
+    mutationFn: deleteTodoRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+    }
+  });
 
+  // Action handlers
   function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim()) return;
 
-    fetch("http://localhost:3000/todos", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title }),
-    })
-      .then((res) => res.json())
-      .then((newTodo) => {
-        setTodos((prev) => [...prev, newTodo]);
-        setTitle("");
-      })
-      .catch(console.error);
+    createTodoMutation.mutate(title);
   }
 
-  async function toggleTodo(id) {
-    const todo = todos.find((t) => t.id === id);
+  function toggleTodo(id) {
+    const todo = todos?.find((t) => t.id === id);
     if (!todo) return;
 
-    const res = await fetch(`http://localhost:3000/todos/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        completed: !todo.completed,
-      }),
-    });
+    setTogglingId(id);
 
-    const updatedTodo = await res.json();
-
-    setTodos((prev) =>
-      prev.map((t) => (t.id === updatedTodo.id ? updatedTodo : t))
+    toggleTodoMutation.mutate(
+      { id, completed: !todo.completed },
+      {
+        onSettled: () => {
+          setTogglingId(null);
+        }
+      }
     );
   }
 
-  async function deleteTodo(id) {
-    await fetch(`http://localhost:3000/todos/${id}`, {
-      method: "DELETE",
-    });
-    setTodos((prev) => prev.filter((t) => t.id !== id));
+  function deleteTodo(id) {
+    deleteTodoMutation.mutate(id);
   }
 
   return (
@@ -75,24 +127,41 @@ function App() {
             placeholder="What needs to be done?"
             className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder:text-slate-400"
           />
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors duration-200 shadow-sm active:transform active:scale-95">
-            Add
+          <button
+            disabled={createTodoMutation.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors duration-200 shadow-sm active:transform active:scale-95">
+            {createTodoMutation.isPending ? "Adding..." : "Add"}
           </button>
         </form>
 
         <ul className="space-y-3">
-          {todos.length === 0 ? (
-            <p className="text-center text-slate-500 py-4 italic">No todos yet. Add one above! ✨</p>
-          ) : (
-            todos.map((todo) => (
-              <TodoItem
-                key={todo.id}
-                todo={todo}
-                onToggle={toggleTodo}
-                onDelete={deleteTodo}
-              />
-            ))
+          {isLoading && (
+            <p className="textCenter text-slate-500 py-4 italic">
+              Loading todos...
+            </p>
           )}
+
+          {isError && (
+            <p className="textCenter text-red-500 py-4 italic">
+              {error.message}
+            </p>
+          )}
+
+          {!isLoading && !isError && todos?.length === 0 && (
+            <p className="text-center text-slate-500 py-4 italic">
+              No todos yet. Add one above! ✨
+            </p>
+          )}
+
+          {!isLoading && !isError && todos?.map((todo) => (
+            <TodoItem
+              key={todo.id}
+              todo={todo}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+              isToggling={todo.id === togglingId}
+            />
+          ))}
         </ul>
       </div>
     </div>
